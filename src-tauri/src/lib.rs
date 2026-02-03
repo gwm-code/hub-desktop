@@ -34,11 +34,10 @@ pub async fn start_ssh_tunnel(
             Ok(t) => t,
             Err(_) => return,
         };
-        let sess = match Session::new() {
+        let mut sess = match Session::new() {
             Ok(s) => s,
             Err(_) => return,
         };
-        let mut sess = sess;
         sess.set_tcp_stream(tcp);
         if let Err(_) = sess.handshake() {
             return;
@@ -71,29 +70,43 @@ pub async fn start_ssh_tunnel(
                     Err(_) => continue,
                 };
 
-                let mut local_clone = local_stream.try_clone().unwrap();
-                
-                // Use a scope to manage channel streaming without thread safety issues
-                let mut remote_stream = remote_channel.stream(0);
-                let mut remote_read = remote_channel.stream(0);
-                
-                // Copy local to remote
-                thread::spawn(move || {
-                    let mut buf = [0; 16384];
-                    while let Ok(n) = local_clone.read(&mut buf) {
-                        if n == 0 { break; }
-                        if remote_stream.write_all(&buf[..n]).is_err() { break; }
-                    }
-                });
+                local_stream.set_nonblocking(true).ok();
+                remote_channel.set_blocking(false);
 
-                // Copy remote to local
-                thread::spawn(move || {
-                    let mut buf = [0; 16384];
-                    while let Ok(n) = remote_read.read(&mut buf) {
-                        if n == 0 { break; }
-                        if local_stream.write_all(&buf[..n]).is_err() { break; }
+                // Single-threaded proxy loop using non-blocking I/O
+                // This avoids moving !Send types (Channel/Stream) into other threads
+                let mut buf_l2r = [0; 16384];
+                let mut buf_r2l = [0; 16384];
+
+                while !*thread_stop_signal.lock().unwrap() {
+                    let mut acted = false;
+
+                    // Local to Remote
+                    match local_stream.read(&mut buf_l2r) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            let _ = remote_channel.write_all(&buf_l2r[..n]);
+                            acted = true;
+                        }
+                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                        Err(_) => break,
                     }
-                });
+
+                    // Remote to Local
+                    match remote_channel.read(&mut buf_r2l) {
+                        Ok(0) => break,
+                        Ok(n) => {
+                            let _ = local_stream.write_all(&buf_r2l[..n]);
+                            acted = true;
+                        }
+                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                        Err(_) => break,
+                    }
+
+                    if !acted {
+                        thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                }
             }
             thread::sleep(std::time::Duration::from_millis(100));
         }
@@ -110,15 +123,12 @@ pub fn stop_ssh_tunnel() -> Result<(), String> {
     
     let mut handle_lock = SSH_HANDLE.lock().map_err(|e| e.to_string())?;
     if let Some(handle) = handle_lock.take() {
-        // We don't join to avoid blocking the main thread if the listener is stuck
-        // But in a real app we might want to be cleaner.
         drop(handle);
     }
     
     Ok(())
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
