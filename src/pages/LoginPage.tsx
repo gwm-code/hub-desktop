@@ -2,10 +2,19 @@ import React, { useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { createApi } from '../services/api';
-import { Globe, Lock, Server } from 'lucide-react';
+import { Globe, Lock, Server, Shield } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 
 export const LoginPage: React.FC = () => {
-  const { serverUrl, setServerUrl } = useSettingsStore();
+  const { 
+    serverUrl, setServerUrl,
+    useSsh, setUseSsh,
+    sshHost, setSshHost,
+    sshUser, setSshUser,
+    sshPort, setSshPort,
+    sshPassword, setSshPassword
+  } = useSettingsStore();
+
   const [urlInput, setUrlInput] = useState(serverUrl);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,17 +27,32 @@ export const LoginPage: React.FC = () => {
     setLoading(true);
     setError('');
     
-    // Save the URL to the store first
-    setServerUrl(urlInput);
-
     try {
+      if (useSsh) {
+        setError('Establishing SSH Tunnel...');
+        await invoke('start_ssh_tunnel', {
+          host: sshHost,
+          port: sshPort,
+          username: sshUser,
+          password: sshPassword || null
+        });
+        // Override server URL to localhost for SSH tunnel
+        const tunnelUrl = 'http://localhost:4000';
+        setServerUrl(tunnelUrl);
+        setUrlInput(tunnelUrl);
+      } else {
+        setServerUrl(urlInput);
+      }
+
       // Create API instance with the new URL
       const api = createApi();
       const response = await api.post('/api/auth/login', { password });
       setToken(response.data.token);
     } catch (err: any) {
       console.error('Login failed:', err);
-      if (!err.response) {
+      if (typeof err === 'string') {
+        setError(`SSH Error: ${err}`);
+      } else if (!err.response) {
         setError('Could not connect to server. Check the URL.');
       } else {
         setError(err.response?.data?.error || 'Invalid password');
@@ -81,24 +105,81 @@ export const LoginPage: React.FC = () => {
 
             {showAdvanced && (
               <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div>
-                  <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5 block">
-                    Server Address
+                <div className="flex items-center gap-2 mb-4 p-3 bg-zinc-950 border border-zinc-800 rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="useSsh"
+                    checked={useSsh}
+                    onChange={(e) => setUseSsh(e.target.checked)}
+                    className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="useSsh" className="text-sm font-medium text-zinc-300 flex items-center gap-2 cursor-pointer">
+                    <Shield size={14} className="text-blue-500" />
+                    Use SSH Tunnel
                   </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all pl-11 text-sm font-mono"
-                      placeholder="http://your-ip:4000"
-                      value={urlInput}
-                      onChange={(e) => setUrlInput(e.target.value)}
-                    />
-                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
-                  </div>
-                  <p className="mt-2 text-[10px] text-zinc-600 px-1">
-                    Enter your server's public IP and API port (default 4000).
-                  </p>
                 </div>
+
+                {useSsh ? (
+                  <div className="space-y-3 p-3 bg-zinc-950/50 border border-zinc-800 rounded-xl">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-semibold text-zinc-500 uppercase mb-1 block">Host</label>
+                        <input
+                          type="text"
+                          value={sshHost}
+                          onChange={(e) => setSshHost(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                          placeholder="1.2.3.4"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-zinc-500 uppercase mb-1 block">Port</label>
+                        <input
+                          type="number"
+                          value={sshPort}
+                          onChange={(e) => setSshPort(parseInt(e.target.value))}
+                          className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-zinc-500 uppercase mb-1 block">Username</label>
+                      <input
+                        type="text"
+                        value={sshUser}
+                        onChange={(e) => setSshUser(e.target.value)}
+                        className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                        placeholder="root"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-zinc-500 uppercase mb-1 block">Password</label>
+                      <input
+                        type="password"
+                        value={sshPassword}
+                        onChange={(e) => setSshPassword(e.target.value)}
+                        className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5 block">
+                      Server Address
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all pl-11 text-sm font-mono"
+                        placeholder="http://your-ip:4000"
+                        value={urlInput}
+                        onChange={(e) => setUrlInput(e.target.value)}
+                      />
+                      <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -127,7 +208,7 @@ export const LoginPage: React.FC = () => {
         </form>
 
         <p className="text-[10px] text-center text-zinc-700">
-          v1.0.0 Stable | Encrypted Connection
+          v1.1.0 Stable | SSH & Encrypted
         </p>
       </div>
     </div>
