@@ -16,7 +16,7 @@ async fn start_ssh_tunnel(
     port: u16,
     username: String,
     password: Option<String>,
-    private_key_path: Option<String>,
+    private_key: Option<String>,
 ) -> Result<(), String> {
     let mut stop_signal = STOP_SIGNAL.lock().map_err(|e| e.to_string())?;
     *stop_signal = false;
@@ -43,12 +43,12 @@ async fn start_ssh_tunnel(
             return;
         }
 
-        if let Some(pw) = password {
-            if let Err(_) = sess.userauth_password(&username, &pw) {
+        if let Some(key_content) = private_key {
+            if let Err(_) = sess.userauth_pubkey_memory(&username, None, &key_content, None) {
                 return;
             }
-        } else if let Some(path) = private_key_path {
-            if let Err(_) = sess.userauth_pubkey_file(&username, None, std::path::Path::new(&path), None) {
+        } else if let Some(pw) = password {
+            if let Err(_) = sess.userauth_password(&username, &pw) {
                 return;
             }
         }

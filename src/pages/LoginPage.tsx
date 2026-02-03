@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { createApi } from '../services/api';
-import { Globe, Lock, Server, Shield } from 'lucide-react';
+import { Globe, Lock, Server, Shield, Key } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 
 export const LoginPage: React.FC = () => {
@@ -17,6 +17,8 @@ export const LoginPage: React.FC = () => {
 
   const [urlInput, setUrlInput] = useState(serverUrl);
   const [password, setPassword] = useState('');
+  const [sshKey, setSshKey] = useState('');
+  const [useKeyAuth, setUseKeyAuth] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -34,7 +36,8 @@ export const LoginPage: React.FC = () => {
           host: sshHost,
           port: sshPort,
           username: sshUser,
-          password: sshPassword || null
+          password: useKeyAuth ? null : (sshPassword || null),
+          privateKey: useKeyAuth ? (sshKey || null) : null
         });
         // Override server URL to localhost for SSH tunnel
         const tunnelUrl = 'http://localhost:4000';
@@ -152,16 +155,43 @@ export const LoginPage: React.FC = () => {
                         placeholder="root"
                       />
                     </div>
-                    <div>
-                      <label className="text-[10px] font-semibold text-zinc-500 uppercase mb-1 block">Password</label>
+                    
+                    <div className="flex items-center gap-2 py-1">
                       <input
-                        type="password"
-                        value={sshPassword}
-                        onChange={(e) => setSshPassword(e.target.value)}
-                        className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                        placeholder="••••••••"
+                        type="checkbox"
+                        id="useKeyAuth"
+                        checked={useKeyAuth}
+                        onChange={(e) => setUseKeyAuth(e.target.checked)}
+                        className="w-3 h-3 rounded border-zinc-700 bg-zinc-900 text-blue-600 focus:ring-blue-500"
                       />
+                      <label htmlFor="useKeyAuth" className="text-[10px] font-semibold text-zinc-500 uppercase cursor-pointer">
+                        Use SSH Key instead of password
+                      </label>
                     </div>
+
+                    {useKeyAuth ? (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-semibold text-zinc-500 uppercase mb-1 block">Private Key Content</label>
+                        <textarea
+                          rows={4}
+                          value={sshKey}
+                          onChange={(e) => setSshKey(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-[10px] font-mono focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+                          placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="text-[10px] font-semibold text-zinc-500 uppercase mb-1 block">SSH Password</label>
+                        <input
+                          type="password"
+                          value={sshPassword}
+                          onChange={(e) => setSshPassword(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                          placeholder="••••••••"
+                        />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div>
@@ -208,7 +238,7 @@ export const LoginPage: React.FC = () => {
         </form>
 
         <p className="text-[10px] text-center text-zinc-700">
-          v1.1.0 Stable | SSH & Encrypted
+          v1.2.0 Stable | SSH Key Auth Enabled
         </p>
       </div>
     </div>
