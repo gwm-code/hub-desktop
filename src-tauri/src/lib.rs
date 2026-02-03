@@ -1,5 +1,5 @@
 use std::net::{TcpListener, TcpStream};
-use std::io::{Read, Write};
+use std::io::{Read, Write, ErrorKind};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use ssh2::Session;
@@ -11,7 +11,7 @@ lazy_static! {
 }
 
 #[tauri::command]
-pub async fn start_ssh_tunnel(
+async fn start_ssh_tunnel(
     host: String,
     port: u16,
     username: String,
@@ -63,6 +63,9 @@ pub async fn start_ssh_tunnel(
         };
         listener.set_nonblocking(true).ok();
 
+        // Make the session non-blocking for the proxy loop
+        sess.set_blocking(false);
+
         while !*thread_stop_signal.lock().unwrap() {
             if let Ok((mut local_stream, _)) = listener.accept() {
                 let mut remote_channel = match sess.channel_direct_tcpip("127.0.0.1", 4000, None) {
@@ -71,10 +74,7 @@ pub async fn start_ssh_tunnel(
                 };
 
                 local_stream.set_nonblocking(true).ok();
-                remote_channel.set_blocking(false);
 
-                // Single-threaded proxy loop using non-blocking I/O
-                // This avoids moving !Send types (Channel/Stream) into other threads
                 let mut buf_l2r = [0; 16384];
                 let mut buf_r2l = [0; 16384];
 
@@ -88,7 +88,7 @@ pub async fn start_ssh_tunnel(
                             let _ = remote_channel.write_all(&buf_l2r[..n]);
                             acted = true;
                         }
-                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                        Err(ref e) if e.kind() == ErrorKind::WouldBlock => {}
                         Err(_) => break,
                     }
 
@@ -99,7 +99,7 @@ pub async fn start_ssh_tunnel(
                             let _ = local_stream.write_all(&buf_r2l[..n]);
                             acted = true;
                         }
-                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                        Err(ref e) if e.kind() == ErrorKind::WouldBlock => {}
                         Err(_) => break,
                     }
 
@@ -117,7 +117,7 @@ pub async fn start_ssh_tunnel(
 }
 
 #[tauri::command]
-pub fn stop_ssh_tunnel() -> Result<(), String> {
+fn stop_ssh_tunnel() -> Result<(), String> {
     let mut stop_signal = STOP_SIGNAL.lock().map_err(|e| e.to_string())?;
     *stop_signal = true;
     
