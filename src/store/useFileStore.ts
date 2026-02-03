@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { useAuthStore } from './useAuthStore';
 import api from '../services/api';
 
 interface FileItem {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Globe, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { createApi } from '../services/api';
+import api from '../services/api';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -13,7 +13,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'latest' | 'error'>('idle');
   const [serverVersion, setServerVersion] = useState<string | null>(null);
   const currentVersion = '1.0.0';
-  const api = createApi();
 
   const handleSave = () => {
     setServerUrl(url);
