@@ -30,6 +30,7 @@ export const useSettingsStore = create<SettingsState>()(
       serverUrl: 'http://localhost:4000', // Default to localhost for SSH tunneling
       setServerUrl: (url) => set({ serverUrl: url }),
       useSsh: true, // Default to SSH tunneling for remote users
+      setUseSsh: (useSsh) => set({ useSsh }),
       sshHost: '89.167.14.222',
       setSshHost: (sshHost) => set({ sshHost }),
       sshUser: 'root',
