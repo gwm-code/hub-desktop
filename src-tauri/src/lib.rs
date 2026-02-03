@@ -34,10 +34,11 @@ pub async fn start_ssh_tunnel(
             Ok(t) => t,
             Err(_) => return,
         };
-        let mut sess = match Session::new() {
+        let sess = match Session::new() {
             Ok(s) => s,
             Err(_) => return,
         };
+        let mut sess = sess;
         sess.set_tcp_stream(tcp);
         if let Err(_) = sess.handshake() {
             return;
@@ -71,18 +72,21 @@ pub async fn start_ssh_tunnel(
                 };
 
                 let mut local_clone = local_stream.try_clone().unwrap();
-                let mut remote_clone = remote_channel.stream(0);
                 
-                // Spawn copy threads for this connection
+                // Use a scope to manage channel streaming without thread safety issues
+                let mut remote_stream = remote_channel.stream(0);
+                let mut remote_read = remote_channel.stream(0);
+                
+                // Copy local to remote
                 thread::spawn(move || {
                     let mut buf = [0; 16384];
                     while let Ok(n) = local_clone.read(&mut buf) {
                         if n == 0 { break; }
-                        if remote_clone.write_all(&buf[..n]).is_err() { break; }
+                        if remote_stream.write_all(&buf[..n]).is_err() { break; }
                     }
                 });
 
-                let mut remote_read = remote_channel.stream(0);
+                // Copy remote to local
                 thread::spawn(move || {
                     let mut buf = [0; 16384];
                     while let Ok(n) = remote_read.read(&mut buf) {
