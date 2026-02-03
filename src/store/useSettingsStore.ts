@@ -27,13 +27,12 @@ export const useSettingsStore = create<SettingsState>()(
       setShowTerminal: (show) => set({ showTerminal: show }),
       isArtifactsOpen: false,
       setIsArtifactsOpen: (open) => set({ isArtifactsOpen: open }),
-      serverUrl: 'https://hub.gwmcode.com', // Default production URL
+      serverUrl: 'http://localhost:4000', // Default to localhost for SSH tunneling
       setServerUrl: (url) => set({ serverUrl: url }),
-      useSsh: false,
-      setUseSsh: (useSsh) => set({ useSsh }),
-      sshHost: '',
+      useSsh: true, // Default to SSH tunneling for remote users
+      sshHost: '89.167.14.222',
       setSshHost: (sshHost) => set({ sshHost }),
-      sshUser: '',
+      sshUser: 'root',
       setSshUser: (sshUser) => set({ sshUser }),
       sshPort: 22,
       setSshPort: (sshPort) => set({ sshPort }),
