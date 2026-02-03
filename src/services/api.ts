@@ -1,9 +1,22 @@
 import axios from 'axios';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { useAuthStore } from '../store/useAuthStore';
 
-export const createApi = () => {
+// Create a stable instance
+const api = axios.create();
+
+// Interceptor to always use the latest serverUrl and Token
+api.interceptors.request.use((config) => {
   const { serverUrl } = useSettingsStore.getState();
-  return axios.create({
-    baseURL: serverUrl,
-  });
-};
+  const { token } = useAuthStore.getState();
+  
+  config.baseURL = serverUrl;
+  
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  
+  return config;
+});
+
+export default api;

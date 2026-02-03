@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuthStore } from '../store/useAuthStore';
 
 interface AgentSession {
@@ -62,9 +62,7 @@ export const AgentNodes: React.FC = () => {
 
   const fetchAgents = async () => {
     try {
-      const response = await axios.get('/api/agents', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/api/agents');
       
       const sessions = response.data.sessions || [];
       const mappedAgents = sessions.map((s: any) => {

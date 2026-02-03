@@ -1,12 +1,6 @@
 import { create } from 'zustand';
 import { useAuthStore } from './useAuthStore';
-import { useSettingsStore } from './useSettingsStore';
-import axios from 'axios';
-
-const getApi = () => {
-  const { serverUrl } = useSettingsStore.getState();
-  return axios.create({ baseURL: serverUrl });
-};
+import api from '../services/api';
 
 interface FileItem {
   name: string;
@@ -45,11 +39,8 @@ export const useFileStore = create<FileStore>((set, get) => ({
     const targetPath = path || get().currentPath;
     set({ isLoading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      const api = getApi();
       const response = await api.get(`/api/files/list`, {
-        params: { path: targetPath },
-        headers: { Authorization: `Bearer ${token}` }
+        params: { path: targetPath }
       });
       set({ files: response.data, currentPath: targetPath, isLoading: false });
     } catch (err: any) {
@@ -58,69 +49,45 @@ export const useFileStore = create<FileStore>((set, get) => ({
   },
 
   readFile: async (path) => {
-    const token = useAuthStore.getState().token;
-    const api = getApi();
     const response = await api.get(`/api/files/read`, {
-      params: { path },
-      headers: { Authorization: `Bearer ${token}` }
+      params: { path }
     });
     set({ lastReferencedFile: path });
     return response.data.content;
   },
 
   writeFile: async (path, content) => {
-    const token = useAuthStore.getState().token;
-    const api = getApi();
-    await api.post(`/api/files/write`, 
-      { path, content },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    await api.post(`/api/files/write`, { path, content });
     set({ lastReferencedFile: path });
     await get().fetchFiles();
   },
 
   deleteFile: async (path: string) => {
-    const token = useAuthStore.getState().token;
-    const api = getApi();
     await api.delete(`/api/files/delete`, {
-      params: { path },
-      headers: { Authorization: `Bearer ${token}` }
+      params: { path }
     });
     await get().fetchFiles();
   },
 
   renameFile: async (oldPath, newPath) => {
-    const token = useAuthStore.getState().token;
-    const api = getApi();
-    await api.post(`/api/files/rename`, 
-      { oldPath, newPath },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    await api.post(`/api/files/rename`, { oldPath, newPath });
     await get().fetchFiles();
   },
 
   uploadFile: async (targetDir, file) => {
-    const token = useAuthStore.getState().token;
-    const api = getApi();
     const formData = new FormData();
     formData.append('file', file);
     
     await api.post(`/api/files/upload`, formData, {
       params: { path: targetDir },
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data'
-      }
+      headers: { 'Content-Type': 'multipart/form-data' }
     });
     await get().fetchFiles();
   },
 
   downloadFile: async (path, name) => {
-    const token = useAuthStore.getState().token;
-    const api = getApi();
     const response = await api.get(`/api/files/download`, {
       params: { path },
-      headers: { Authorization: `Bearer ${token}` },
       responseType: 'blob'
     });
     

@@ -5,14 +5,13 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { FileBrowser } from './FileBrowser';
 
-import { createApi } from '../services/api';
+import api from '../services/api';
 
 interface SidebarProps {
   toggle: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ toggle }) => {
-  const api = createApi();
   const { 
     conversations, 
     currentConversationId, 

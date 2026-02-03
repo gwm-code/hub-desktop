@@ -7,7 +7,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useSocket } from '../hooks/useSocket';
 import { DiffViewer } from './DiffViewer';
 import { AgentNodes } from './AgentNodes';
-import { createApi } from '../services/api';
+import api from '../services/api';
 
 export const ChatArea: React.FC = () => {
   const [input, setInput] = useState('');
@@ -23,7 +23,6 @@ export const ChatArea: React.FC = () => {
   const { sendMessage } = useSocket();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const api = createApi();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
