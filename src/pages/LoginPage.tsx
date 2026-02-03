@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { createApi } from '../services/api';
-import { Globe, Lock, Server, Shield, Key } from 'lucide-react';
+import { Globe, Lock, Server, Shield } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 
 export const LoginPage: React.FC = () => {
