@@ -180,10 +180,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ toggle }) => {
               ) : (
                 <>
                   <span className="truncate flex-1">{chat.title || 'New Conversation'}</span>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity md:opacity-40">
                     <button
                       onClick={(e) => startEditing(e, chat.id, chat.title)}
-                      className="p-1 hover:bg-zinc-700 rounded"
+                      className="p-1 hover:bg-zinc-700 hover:text-white rounded"
                       title="Rename"
                     >
                       <Edit2 size={12} />

@@ -68,7 +68,8 @@ export const AgentNodes: React.FC = () => {
       const mappedAgents = sessions.map((s: any) => {
         const parts = s.key.split(':');
         const type = parts[2] || 'agent';
-        const label = s.label || s.displayName || parts[3] || type;
+        // Use displayName if available, then fallback to parts[3], then type
+        const label = s.displayName || parts[3] || type;
         const sessionId = s.sessionId || s.id || 'unknown';
         
         // Map status
