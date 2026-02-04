@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Hash, FileCode, Cpu, BarChart3 } from 'lucide-react';
+import { Send, Hash, FileCode, Cpu, Check } from 'lucide-react';
 import { useChatStore } from '../store/useChatStore';
 import { useFileStore } from '../store/useFileStore';
 import { useEditorStore } from '../store/useEditorStore';
-import { useAuthStore } from '../store/useAuthStore';
 import { useSocket } from '../hooks/useSocket';
 import { DiffViewer } from './DiffViewer';
 import { AgentNodes } from './AgentNodes';
@@ -14,15 +13,15 @@ export const ChatArea: React.FC = () => {
   const [pendingPatch, setPendingPatch] = useState<{ path: string, content: string, oldContent: string } | null>(null);
   const { 
     messages, currentConversationId, isStreaming, activeTools, 
-    model, availableModels, sessionTokens, totalTokens,
+    model, availableModels, 
     setModel, setAvailableModels 
   } = useChatStore();
-  const token = useAuthStore(state => state.token);
   const { readFile, writeFile, uploadFile } = useFileStore();
   const { activeFile, isLiveEditEnabled, setLiveEditEnabled } = useEditorStore();
-  const { sendMessage } = useSocket();
+  const { sendMessage, socket } = useSocket();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [modelApplied, setModelApplied] = useState<string | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -34,16 +33,14 @@ export const ChatArea: React.FC = () => {
   useEffect(() => {
     const fetchModels = async () => {
       try {
-        const response = await api.get('/api/models', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await api.get('/api/models');
         setAvailableModels(response.data);
       } catch (err) {
         console.error('Failed to fetch models:', err);
       }
     };
-    if (token) fetchModels();
-  }, [token, setAvailableModels]);
+    fetchModels();
+  }, [setAvailableModels]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,41 +191,58 @@ export const ChatArea: React.FC = () => {
       <div className="p-4 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent border-t border-zinc-900/50">
         <div className="max-w-4xl mx-auto mb-3 flex items-center justify-between gap-4 px-1">
           {/* Model Selection */}
-          <div className="flex items-center gap-2 bg-zinc-900/50 border border-zinc-800 rounded-lg px-2 py-1.5 hover:border-zinc-700 transition-colors">
-            <Cpu size={14} className="text-zinc-500" />
-            <select 
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="bg-transparent text-[11px] font-semibold text-zinc-300 focus:outline-none cursor-pointer pr-1"
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-zinc-900/50 border border-zinc-800 rounded-lg px-2 py-1.5 hover:border-zinc-700 transition-colors">
+              <Cpu size={14} className="text-zinc-500" />
+              <select 
+                value={model}
+                onChange={(e) => {
+                  setModel(e.target.value);
+                  setModelApplied(null); // Reset applied state when model changes
+                }}
+                className="bg-transparent text-[11px] font-semibold text-zinc-300 focus:outline-none cursor-pointer pr-1"
+              >
+                {availableModels.length > 0 ? (
+                  availableModels.map(m => (
+                    <option key={m.id} value={m.id} className="bg-zinc-900 text-zinc-300">
+                      {m.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="google-gemini-cli/gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+                )}
+              </select>
+            </div>
+            
+            {/* Apply Model Button */}
+            <button
+              onClick={() => {
+                if (socket && currentConversationId) {
+                  const modelCommand = `/model ${model}`;
+                  console.log('Sending model command:', modelCommand);
+                  
+                  // Send model command silently (not adding to chat UI)
+                  socket.emit('chat.message', { 
+                    conversationId: currentConversationId, 
+                    content: modelCommand,
+                    context: undefined,
+                    model 
+                  });
+                  
+                  setModelApplied(model);
+                }
+              }}
+              disabled={!currentConversationId || modelApplied === model}
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${
+                modelApplied === model 
+                  ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-600/30' 
+                  : 'bg-blue-600/20 text-blue-400 border border-blue-600/30 hover:bg-blue-600/30'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              title={modelApplied === model ? 'Model applied' : 'Apply selected model'}
             >
-              {availableModels.length > 0 ? (
-                availableModels.map(m => (
-                  <option key={m.id} value={m.id} className="bg-zinc-900 text-zinc-300">
-                    {m.name}
-                  </option>
-                ))
-              ) : (
-                <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
-              )}
-            </select>
-          </div>
-
-          {/* Token Stats Bar */}
-          <div className="flex items-center gap-4 text-[10px] font-mono font-medium text-zinc-500">
-            <div className="flex items-center gap-1.5">
-              <BarChart3 size={12} className="text-zinc-600" />
-              <span className="text-zinc-400">SESSION:</span>
-              <span className={sessionTokens > 0 ? "text-blue-400" : "text-zinc-600"}>
-                {sessionTokens.toLocaleString()} tokens
-              </span>
-            </div>
-            <div className="w-px h-3 bg-zinc-800" />
-            <div className="flex items-center gap-1.5">
-              <span className="text-zinc-400">TOTAL:</span>
-              <span className={totalTokens > 0 ? "text-emerald-400" : "text-zinc-600"}>
-                {totalTokens.toLocaleString()} tokens
-              </span>
-            </div>
+              <Check size={12} />
+              {modelApplied === model ? 'Applied' : 'Apply'}
+            </button>
           </div>
         </div>
 

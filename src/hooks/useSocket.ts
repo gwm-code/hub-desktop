@@ -30,7 +30,12 @@ export const useSocket = () => {
     };
 
     const onToken = (data: any) => {
-      updateLastMessage(data.token);
+      // Use technical extraction logic to filter technical logs and JSON leaks
+      let token = data.token;
+      if (token.includes('injecting env') || token.includes('"level":')) {
+        return;
+      }
+      updateLastMessage(token);
     };
 
     const onTokenUpdate = (data: any) => {
